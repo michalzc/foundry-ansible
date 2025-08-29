@@ -1,0 +1,18 @@
+---
+- name: Docker Services
+  hosts: all
+  tasks:
+    - name: Docker Compose Down
+      community.docker.docker_compose_v2:
+        project_src: /svc
+        remove_orphans: true
+        state: absent
+      when: (docker_down | default(false) | bool) or (docker_restart | default(false) | bool)
+        
+    - name: Docker Compose Up
+      community.docker.docker_compose_v2:
+        project_src: /svc
+        remove_orphans: true
+        state: present
+      when: not docker_down | default(false) | bool
+

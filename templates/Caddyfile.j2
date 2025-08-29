@@ -1,0 +1,41 @@
+fileserver.{{ host_address }} {
+   {% if not need_tls -%}
+   tls internal
+   {% endif -%}
+   
+   root * /data/fileserver
+
+    # Handle preflight OPTIONS requests
+    @preflight method OPTIONS
+    respond @preflight 204
+
+    # Set CORS headers for all responses
+    header {
+        Access-Control-Allow-Origin "{http.request.header.Origin}"
+        Access-Control-Allow-Methods "GET, POST, OPTIONS"
+        Access-Control-Allow-Headers "Origin, Content-Type, Accept, Authorization"
+        Access-Control-Allow-Credentials false
+        Access-Control-Max-Age 3600
+    }
+
+   file_server browse
+}
+
+{% for item in foundry_versions %}
+foundry-{{ item.prefix }}.{{ host_address }} {
+   {% if not need_tls -%}
+   tls internal
+   {% endif -%}
+
+   reverse_proxy foundry-{{ item.prefix }}:30000
+}
+{% endfor %}
+
+wiki.{{ host_address }} {
+   {% if not need_tls -%}
+   tls internal
+   {% endif -%}
+
+   reverse_proxy wiki:8080
+}
+

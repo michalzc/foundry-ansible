@@ -1,0 +1,98 @@
+---
+- name: Base Layout
+  hosts: all
+  become: true
+  tasks:
+    - name: Create postgres directory
+      ansible.builtin.file:
+        path: /svc/data/postgres
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        state: directory
+        mode: 0700
+
+    - name: Create wiki directory
+      ansible.builtin.file:
+        path: /svc/data/wiki
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        state: directory
+        mode: 0700
+
+    - name: Create Caddy data directory
+      ansible.builtin.file:
+        path: /svc/data/caddy/data/fileserver
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        state: directory
+        mode: 0700
+
+    - name: Create Caddy config directory
+      ansible.builtin.file:
+        path: /svc/data/caddy/config
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        state: directory
+        mode: 0700
+
+    - name: Foundry Directory
+      ansible.builtin.file:
+        path: "/svc/data/foundry-{{ item.prefix }}"
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        state: directory
+        mode: 0700
+      loop: "{{ foundry_versions }}"
+
+    - name: Env directory
+      ansible.builtin.file:
+        path: /svc/envs
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        state: directory
+        mode: 0700
+
+- name: Config Files
+  hosts: all
+  tasks:
+    - name: Caddyfile
+      ansible.builtin.template:
+        src: templates/Caddyfile.j2
+        dest: /svc/data/caddy/Caddyfile
+
+    - name: Postgres Env
+      ansible.builtin.template:
+        src: templates/postgresql.env.j2
+        dest: /svc/envs/postgresql.env
+
+    - name: XWiki Env
+      ansible.builtin.template:
+        src: templates/xwiki.env.j2
+        dest: /svc/envs/xwiki.env
+
+    - name: Foundry secrets
+      ansible.builtin.copy:
+        src: files/foundry-secrets.json
+        dest: /svc/envs/foundry-secrets.json
+        mode: 0400
+
+    - name: Foundry Env
+      vars:
+        foundry_prefix: "{{ item.prefix }}"
+        foundry_version: "{{ item.version }}"
+      ansible.builtin.template:
+        src: templates/foundry.env.j2
+        dest: "/svc/envs/foundry-{{ item.prefix }}.env"
+        mode: 0400
+      loop: "{{ foundry_versions }}"
+
+    - name: Foundry Cache
+      synchronize:
+        src: files/foundry-cache/
+        dest: /svc/data/foundry-cache/
+        mode: push
+
+    - name: Docker compose
+      ansible.builtin.template:
+        src: templates/docker-compose.yml.j2
+        dest: /svc/docker-compose.yml

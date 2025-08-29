@@ -1,0 +1,67 @@
+---
+- name: Check connection
+  hosts: all
+  vars:
+    ansible_user: root
+    ansible_ssh_pass: "{{ root_password }}"
+  tasks:
+    - name: Ping hosts
+      ansible.builtin.ping:
+
+- name: User
+  hosts: all
+  vars:
+    ansible_user: root
+    ansible_ssh_pass: "{{ root_password }}"    
+  tasks:
+    - name: Create group
+      ansible.builtin.group:
+        name: "{{ user }}"
+        gid: "{{ group_id }}"
+        system: true
+
+    - name: Create user
+      ansible.builtin.user:
+        name: "{{ user }}"
+        group: "{{ user }}"
+        uid: "{{ user_id }}"
+        password_lock: false
+        password: '*'
+        shell: /usr/bin/bash
+
+    - name: Copy SSH key
+      ansible.posix.authorized_key:
+        user: "{{ user }}"
+        state: present
+        key: "{{ lookup('file', '/home/michal/.ssh/id_ed25519.pub') }}"
+
+    - name: Update sudoers
+      community.general.sudoers:
+        name: "{{ user }}-sudo"
+        user: "{{ user }}"
+        commands: ALL
+        nopassword: true
+
+- name: Disable root and password access via ssh
+  hosts: all
+  tags: ssh
+  vars:
+    ansible_user: root
+    ansible_ssh_pass: "{{ root_password }}"
+  tasks:
+    - name: Copy old ssh config
+      ansible.builtin.copy:
+        src: /etc/ssh/sshd_config
+        dest: /etc/ssh/sshd_config.bak
+        remote_src: true
+
+    - name: Disable root and password ssh access
+      ansible.builtin.copy:
+        src: files/sshd_config
+        dest: /etc/ssh/sshd_config
+        force: true
+
+    - name: Restart SSHD
+      ansible.builtin.service:
+        name: ssh
+        state: restarted

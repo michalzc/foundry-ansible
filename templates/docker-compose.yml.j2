@@ -1,0 +1,70 @@
+---
+name: foundry
+
+services:
+  wiki:
+    image: xwiki:17.6.0-postgres-tomcat
+    container_name: wiki
+    depends_on:
+      - postgres-db
+    env_file: /svc/envs/xwiki.env
+    volumes:
+      - /svc/data/wiki:/usr/local/xwiki
+    networks:
+      - {{ docker_network }}
+
+  postgres-db:
+    image: postgres:17.6
+    container_name: postgres-db
+    env_file: /svc/envs/postgresql.env
+    volumes:
+      - /svc/data/postgres:/var/lib/postgresql/data
+    networks:
+      - {{ docker_network }}
+
+{% for item in foundry_versions %}
+  foundry-{{ item.prefix }}:
+      image: felddy/foundryvtt:{{ foundry_image_version }}
+      container_name: foundry-{{ item.prefix }}
+      volumes:
+        - /svc/data/foundry-{{ item.prefix }}:/data
+        - /svc/data/foundry-cache:/foundry-cache
+      user: {{ user_id }}:{{ group_id }}
+      env_file:
+        - /svc/envs/foundry-{{ item.prefix }}.env
+      networks:
+        - {{ docker_network }}
+      secrets:
+        - source: foundry
+          target: config.json  
+
+{% endfor %}
+
+  caddy:
+    image: caddy:2.10.0
+    container_name: caddy
+    restart: unless-stopped
+    user: {{ user_id }}:{{ group_id }}    
+    depends_on:
+      - wiki
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - /svc/data/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - /svc/data/caddy/data:/data
+      - /svc/data/caddy/config:/config
+    networks:
+      - {{ docker_network }}
+
+
+
+networks:
+  {{ docker_network }}:
+
+secrets:
+  foundry:
+    file: /svc/envs/foundry-secrets.json
